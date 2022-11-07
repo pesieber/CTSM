@@ -77,7 +77,15 @@ if [ $COMPILER = gnu ] ; then
     module load cray-netcdf-hdf5parallel
     module load cray-hdf5-parallel
     module load cray-parallel-netcdf
-    spack load oasis%gcc
+fi
+if [ $COMPILER = "gnu-oasis" ] ; then
+    module switch PrgEnv-cray PrgEnv-gnu
+    module switch gcc gcc/9.3.0 # the default version gives an error when building gptl
+    module load cray-mpich
+    module load cray-netcdf-hdf5parallel
+    module load cray-hdf5-parallel
+    module load cray-parallel-netcdf
+    cp config_compilers.xml cime/config/cesm/machines/config_compilers.xml
 fi
 
 #alias python=python2.7 # currently in .bashrc, but does not work for cray PATH
@@ -284,6 +292,7 @@ print_log "*** Finished building new case in ${CASEDIR} ***"
 print_log "*** Preview the run ***"
 ./preview_run | tee -a $logfile
 
+
 print_log "*** Submitting job ***"
 ./case.submit -a "-C gpu" | tee -a $logfile
 
@@ -291,7 +300,7 @@ print_log "*** Submitting job ***"
 # ./case.submit -a "-C gpu -p normal --ntasks-per-node 12" 
 # or by setting in config_batch.xml
 
-squeue --user=psieber | tee -a $logfile
+squeue --user=juckerj | tee -a $logfile
 #less CaseStatus
 
 enddate=`date +'%Y-%m-%d %H:%M:%S'`
