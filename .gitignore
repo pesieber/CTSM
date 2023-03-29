@@ -1,10 +1,10 @@
 .ipynb_checkpoints*
 
-# the output of the xfer transfer job
+# files created by transfer_clm_inputdata.sh (xfer job)
 transfer_clm_inputdata.err
 transfer_clm_inputdata.out
 
-
+>>>>>>> 70e53c334176029b3b5948ce9008c861fcc215c7
 # directories checked out by manage_externals, and other files created
 # by manage_externals
 manage_externals.log
