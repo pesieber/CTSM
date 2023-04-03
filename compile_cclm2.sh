@@ -20,10 +20,13 @@ RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downlo
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=gnu-oasis # gnu for gcc, or nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config, (2) copy oasis source code to CASEDIR
-DRIVER=mct # default is mct, using nuopc requires ESMF installation
-EXP=cclm2_lon360_${date} # custom case name
+COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
+
+EXP=cclm2_${date} # custom case name
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$DOMAIN.$EXP
+
+DRIVER=mct # default is mct, using nuopc requires ESMF installation
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
@@ -78,7 +81,7 @@ rsync -rv --ignore-existing /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT
 # Find spack_oasis installation (used in .cime/config_compilers.xml)
 if [[ $COMPILER =~ "oasis" ]]; then
     print_log "*** Finding spack_oasis ***"
-    export OASIS_PATH=$(spack location -i oasis%gcc) # e.g. /project/sm61/psieber/spack-install/oasis/master/gcc/24obfvejulxnpfxiwatzmtcddx62pikc
+    export OASIS_PATH=$(spack location -i oasis%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/oasis/master/gcc/24obfvejulxnpfxiwatzmtcddx62pikc
     print_log "*** OASIS at: ${OASIS_PATH} ***"
 fi
 
