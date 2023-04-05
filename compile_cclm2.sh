@@ -15,7 +15,7 @@ echo "*** Setting up case ***"
 
 date=`date +'%Y%m%d-%H%M'` # get current date and time
 startdate=`date +'%Y-%m-%d %H:%M:%S'`
-COMPSET=I2000Clm50SpGs # for CCLM2 (use stub glacier component for regional domain!)
+COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
 RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 
@@ -184,8 +184,9 @@ fi
 #./xmlchange GLC2LND_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
 
 # ESMF interface and time manager (env_build.xml)
-#./xmlchange -file env_build.xml -id COMP_INTERFACE -val "mct" # mct is default in clm5.0, nuopc is default in CTSMdev (requires ESMF installation); adding --driver mct to create_newcase creates the case with everything needed
-#./xmlchange -file env_build.xml -id USE_ESMF_LIB -val "FALSE" # FALSE is default in clm5.0; since cesm1_2 ESMF is no longer necessary to run with calendar=gregorian
+if [ $CODE == CTSMdev ] && [ $DRIVER == mct ]; then
+    ./xmlchange --file env_build.xml --id COMP_INTERFACE --val "mct" # mct is default in clm5.0, nuopc is default in CTSMdev (requires ESMF installation); adding --driver mct to create_newcase adds everything needed
+    ./xmlchange --file env_build.xml --id USE_ESMF_LIB --val "FALSE" # FALSE is default in clm5.0; since cesm1_2 ESMF is no longer necessary to run with calendar=gregorian
 #./xmlchange -file env_build.xml -id ESMF_LIBDIR -val ".../lib/libO/Linux.pgi.64.mpiuni.default" # path to ESMF library; can be set in config_machines.xml
 
 
