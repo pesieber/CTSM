@@ -187,6 +187,7 @@ fi
 if [ $CODE == CTSMdev ] && [ $DRIVER == mct ]; then
     ./xmlchange --file env_build.xml --id COMP_INTERFACE --val "mct" # mct is default in clm5.0, nuopc is default in CTSMdev (requires ESMF installation); adding --driver mct to create_newcase adds everything needed
     ./xmlchange --file env_build.xml --id USE_ESMF_LIB --val "FALSE" # FALSE is default in clm5.0; since cesm1_2 ESMF is no longer necessary to run with calendar=gregorian
+fi
 #./xmlchange -file env_build.xml -id ESMF_LIBDIR -val ".../lib/libO/Linux.pgi.64.mpiuni.default" # path to ESMF library; can be set in config_machines.xml
 
 
