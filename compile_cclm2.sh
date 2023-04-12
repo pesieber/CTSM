@@ -64,7 +64,7 @@ rsync -rv --ignore-existing /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT
 
 
 #==========================================
-# Load modules and find spack_oasis
+# Load modules and find spack packages
 #==========================================
 
 # Load modules: now done through $USER/.cime/config_machines.xml
@@ -85,7 +85,16 @@ if [[ $COMPILER =~ "oasis" ]]; then
     print_log "*** OASIS at: ${OASIS_PATH} ***"
 fi
 
+# Find spack_esmf installation (used in .cime/config_machines.xml and env_build.xml)
+if [ $DRIVER == nuopc ]; then
+    print_log "*** Finding spack_esmf ***"
+    export ESMF_PATH=$(spack location -i esmf%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/esmf-8.1.1/gcc-9.3.0/3iv2xwhfgfv7fzpjjayc5wyk5osio5c4
+    print_log "*** ESMF at: ${ESMF_PATH} ***"
+fi
+
 print_log "*** LD_LIBRARY_PATH: ${LD_LIBRARY_PATH} ***"
+
+export CIME_NO_CMAKE_MACRO=1 # for CTSMdev: found directory .cime but no cmake macros within, set env variable CIME_NO_CMAKE_MACRO to use deprecated config_compilers method
 
 
 #==========================================
@@ -184,11 +193,13 @@ fi
 #./xmlchange GLC2LND_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
 
 # ESMF interface and time manager (env_build.xml)
-if [ $CODE == CTSMdev ] && [ $DRIVER == mct ]; then
-    ./xmlchange --file env_build.xml --id COMP_INTERFACE --val "mct" # mct is default in clm5.0, nuopc is default in CTSMdev (requires ESMF installation); adding --driver mct to create_newcase adds everything needed
+./xmlchange --file env_build.xml --id COMP_INTERFACE --val $DRIVER # mct is default in clm5.0, nuopc is default in CTSMdev (requires ESMF installation); adding --driver mct to create_newcase adds everything needed
+
+if [ $DRIVER == mct ]; then    
     ./xmlchange --file env_build.xml --id USE_ESMF_LIB --val "FALSE" # FALSE is default in clm5.0; since cesm1_2 ESMF is no longer necessary to run with calendar=gregorian
+elif [ $DRIVER == nuopc ]; then
+    ./xmlchange --file env_build.xml --id USE_ESMF_LIB --val "TRUE" # using the ESMF library specified by env var ESMFMKFILE (config_machines.xml), or ESMF_LIBDIR (not found in env_build.xml)
 fi
-#./xmlchange -file env_build.xml -id ESMF_LIBDIR -val ".../lib/libO/Linux.pgi.64.mpiuni.default" # path to ESMF library; can be set in config_machines.xml
 
 
 #==========================================
@@ -232,15 +243,15 @@ EOF
 fi
 
 # For global domain keep the defaults (downloaded from svn trunc)
-if [ $DOMAIN == glob ]; then
-cat >> user_nl_clm << EOF
-fsurdat = "$CESMDATAROOT/cesm_inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_16pfts_Irrig_CMIP6_simyr2000_c170824.nc"
-paramfile = "$CESMDATAROOT/cesm_inputdata/lnd/clm2/paramdata/clm5_params.c171117.nc"
-EOF
-cat >> user_nl_datm << EOF
-domainfile = "$CESMDATAROOT/cesm_inputdata/share/domains/domain.clm/domain.lnd.360x720_cruncep.100429.nc"
-EOF
-fi
+#if [ $DOMAIN == glob ]; then
+#cat >> user_nl_clm << EOF
+#fsurdat = "$CESMDATAROOT/cesm_inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_16pfts_Irrig_CMIP6_simyr2000_c170824.nc"
+#paramfile = "$CESMDATAROOT/cesm_inputdata/lnd/clm2/paramdata/clm5_params.c171117.nc"
+#EOF
+#cat >> user_nl_datm << EOF
+#domainfile = "$CESMDATAROOT/cesm_inputdata/share/domains/domain.clm/domain.lnd.360x720_cruncep.100429.nc"
+#EOF
+#fi
 
 # Namelist options available in Ronny's code
 # requires additional variables in the surfdata, e.g. dbh for biomass_heat_storage
