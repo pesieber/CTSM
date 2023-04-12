@@ -146,7 +146,7 @@ fi
 ./xmlchange NTASKS_LND=-$NTASKS 
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
-./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev
+#./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
 
 # Activate debug mode (env_build.xml)
 #./xmlchange DEBUG=TRUE
