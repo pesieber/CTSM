@@ -94,8 +94,6 @@ fi
 
 print_log "*** LD_LIBRARY_PATH: ${LD_LIBRARY_PATH} ***"
 
-export CIME_NO_CMAKE_MACRO=1 # for CTSMdev: found directory .cime but no cmake macros within, set env variable CIME_NO_CMAKE_MACRO to use deprecated config_compilers method
-
 
 #==========================================
 # Create case
