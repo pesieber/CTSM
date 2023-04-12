@@ -26,7 +26,7 @@ COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS
 EXP=cclm2_${date} # custom case name
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$DOMAIN.$EXP
 
-DRIVER=mct # default is mct, using nuopc requires ESMF installation
+DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
@@ -88,7 +88,7 @@ fi
 # Find spack_esmf installation (used in .cime/config_machines.xml and env_build.xml)
 if [ $DRIVER == nuopc ]; then
     print_log "*** Finding spack_esmf ***"
-    export ESMF_PATH=$(spack location -i esmf%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/esmf-8.1.1/gcc-9.3.0/3iv2xwhfgfv7fzpjjayc5wyk5osio5c4
+    export ESMF_PATH=$(spack location -i esmf@8.2.0%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/esmf-8.1.1/gcc-9.3.0/3iv2xwhfgfv7fzpjjayc5wyk5osio5c4
     print_log "*** ESMF at: ${ESMF_PATH} ***"
 fi
 
@@ -128,11 +128,10 @@ cd $CASEDIR
 ./xmlchange RUN_STARTDATE=$STARTDATE
 ./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
 ./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48 # coupling freq default 30min = day,48
-if [ $DRIVER = mct ] ; then
-    ./xmlchange DATM_CLMNCEP_YR_START=2004,DATM_CLMNCEP_YR_END=2004,DATM_CLMNCEP_YR_ALIGN=2004 # in clm5.0 with mct
-fi
-if [ $DRIVER = nuopc ] ; then
-    ./xmlchange DATM_YR_START=2004,DATM_YR_END=2004,DATM_YR_ALIGN=2004 # new variable names in CTSMdev; probably only with nuopc driver
+if [ $CODE == CTSMdev ] && [ $DRIVER == nuopc ]; then
+    ./xmlchange DATM_YR_START=2004,DATM_YR_END=2004,DATM_YR_ALIGN=2004 # new variable names in CTSMdev with nuopc driver
+else
+    ./xmlchange DATM_CLMNCEP_YR_START=2004,DATM_CLMNCEP_YR_END=2004,DATM_CLMNCEP_YR_ALIGN=2004 # in clm5.0 and CLM_features, with any driver
 fi
 
 # Set the number of cores and nodes (env_mach_pes.xml)
@@ -147,7 +146,7 @@ fi
 ./xmlchange NTASKS_LND=-$NTASKS 
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
-#./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev
+./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev
 
 # Activate debug mode (env_build.xml)
 #./xmlchange DEBUG=TRUE
