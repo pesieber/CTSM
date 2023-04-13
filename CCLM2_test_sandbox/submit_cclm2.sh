@@ -1,11 +1,15 @@
 #!/bin/bash
 
+# Set up
+# ------
+cosmo_target=cpu
+
 # Clean up
 # --------
 # cosmo
 rm -f YU*
 # log
-rm -f nout.000000 debug.0[1-2].* core.* cesm*.log cosmo*.log
+rm -f nout.000000 debug.0[1-2].* core.* *.log
 # oasis
 rm -f grids.nc masks.nc areas.nc rmp*.nc
 
@@ -29,10 +33,18 @@ done
 
 # Build task dispatch file
 # ------------------------
-cat > prog_config << EOF
-0-23 ./cesm.sh > cesm.log
-24-47 ./cosmo.sh > cosmo.log
+if [[ ${cosmo_target} == cpu ]]; then
+    cat > prog_config << EOF
+0-23 ./cosmo.sh
+24-47 ./cesm.sh
 EOF
+elif [[ ${cosmo_target} == gpu ]]; then
+    cat > prog_config << EOF
+0,12,24,36 ./cosmo.sh
+1-11,13-23,25-35,37-47 ./cesm.sh
+EOF
+    
+fi
 
 # Submit job
 # ----------
