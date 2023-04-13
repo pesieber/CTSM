@@ -375,6 +375,7 @@ fi
 # ========================================
 if [[ ${CCLM2_TEST} == true ]]; then
     rsync -av ${CLMROOT}/CCLM2_test_sandbox/ $CASEDIR/run/
+    exit 0
 fi
 
 
