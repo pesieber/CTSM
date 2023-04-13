@@ -13,6 +13,8 @@ set -e # failing commands will cause the shell script to exit
 
 echo "*** Setting up case ***"
 
+CCLM2_TEST=true
+
 date=`date +'%Y%m%d-%H%M'` # get current date and time
 startdate=`date +'%Y-%m-%d %H:%M:%S'`
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
@@ -34,8 +36,14 @@ PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
 NTASKS=24
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
 let "NCORES = $NTASKS * 12"
-STARTDATE="2004-01-01"
-NYEARS=1
+if [[ ${CCLM2_TEST} == true ]]; then
+    STARTDATE="2011-01-01"
+    NSECONDS=86400
+else
+    STARTDATE="2004-01-01"
+    NYEARS=1
+fi
+
 
 # Set directories
 export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
@@ -126,7 +134,11 @@ cd $CASEDIR
 ./xmlchange RUN_TYPE=startup
 ./xmlchange RESUBMIT=$NSUBMIT
 ./xmlchange RUN_STARTDATE=$STARTDATE
-./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
+if [[ ${CCLM2_TEST} == true ]]; then
+    ./xmlchange STOP_OPTION=nseconds,STOP_N=$NSECONDS
+else
+    ./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
+fi
 ./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48 # coupling freq default 30min = day,48
 if [ $CODE == CTSMdev ] && [ $DRIVER == nuopc ]; then
     ./xmlchange DATM_YR_START=2004,DATM_YR_END=2004,DATM_YR_ALIGN=2004 # new variable names in CTSMdev with nuopc driver
@@ -355,6 +367,14 @@ if [[ $COMPILER =~ "oasis" ]]; then
     else
         raise error "OASIS_dummy.nc is missing for this domain and resolution" | tee -a $logfile
     fi
+fi
+
+# ========================================
+# CCLM2 test
+# Add cosmo namelists and submit scripts for the EU_CORDEX 50 km domain
+# ========================================
+if [[ ${CCLM2_TEST} == true ]]; then
+    rsync -av ./CCLM2_test_sandbox/ $CASEDIR/run/
 fi
 
 
