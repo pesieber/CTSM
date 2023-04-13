@@ -374,7 +374,7 @@ fi
 # Add cosmo namelists and submit scripts for the EU_CORDEX 50 km domain
 # ========================================
 if [[ ${CCLM2_TEST} == true ]]; then
-    rsync -av ./CCLM2_test_sandbox/ $CASEDIR/run/
+    rsync -av ${CLMROOT}/CCLM2_test_sandbox/ $CASEDIR/run/
 fi
 
 
