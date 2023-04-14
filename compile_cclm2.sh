@@ -31,8 +31,8 @@ MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
 PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
-NTASKS=2 # this will be nr of NODES (was 24)
-let "NCORES = $NTASKS * 12"
+NTASKS=2 # will be nr of NODES (was 24)
+let "NCORES = $NTASKS * 12" # this will be nr of CPUS
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
 STARTDATE="2004-01-01"
 NYEARS=1
@@ -53,12 +53,12 @@ print_log() {
     echo -e "${output}" | tee -a $logfile
 }
 
-print_log "\n *** Case at: ${CASEDIR} ***"
+print_log "*** Case at: ${CASEDIR} ***"
 print_log "*** Case settings: compset ${COMPSET}, resolution ${RES}, domain ${DOMAIN}, compiler ${COMPILER} ***"
 print_log "*** Logfile at: ${logfile} ***"
 
 # Sync inputdata on scratch because scratch will be cleaned every month (change inputfiles on $PROJECT!)
-print_log "\n *** Syncing inputdata on scratch  ***"
+print_log "\n*** Syncing inputdata on scratch  ***"
 rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content
 #sbatch --account=$PROJ --export=ALL,PROJ=$PROJ transfer_clm_inputdata.sh # xfer job to prevent overflowing the loginnode
 
@@ -80,16 +80,16 @@ rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfil
 
 # Find spack_oasis installation (used in .cime/config_compilers.xml)
 if [[ $COMPILER =~ "oasis" ]]; then
-    print_log "\n *** Finding spack_oasis ***"
+    print_log "\n*** Finding spack_oasis ***"
     export OASIS_PATH=$(spack location -i oasis%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/oasis/master/gcc/24obfvejulxnpfxiwatzmtcddx62pikc
-    print_log "*** OASIS at: ${OASIS_PATH} ***"
+    print_log "OASIS at: ${OASIS_PATH}"
 fi
 
 # Find spack_esmf installation (used in .cime/config_machines.xml and env_build.xml)
 if [ $DRIVER == nuopc ]; then
     print_log "\n *** Finding spack_esmf ***"
     export ESMF_PATH=$(spack location -i esmf@8.2.0%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/esmf-8.1.1/gcc-9.3.0/3iv2xwhfgfv7fzpjjayc5wyk5osio5c4
-    print_log "*** ESMF at: ${ESMF_PATH} ***"
+    print_log "ESMF at: ${ESMF_PATH}"
 fi
 
 
@@ -97,7 +97,7 @@ fi
 # Create case
 #==========================================
 
-print_log "\n *** Creating CASE: ${CASENAME} ***"
+print_log "\n*** Creating CASE: ${CASENAME} ***"
 
 cd $CLMROOT/cime/scripts
 ./create_newcase --case $CASEDIR --compset $COMPSET --res $RES --mach $MACH --compiler $COMPILER --driver $DRIVER --project $PROJ --run-unsupported | tee -a $logfile
@@ -108,7 +108,7 @@ cd $CLMROOT/cime/scripts
 # Settings will appear in namelists and have precedence over user_nl_xxx
 #==========================================
 
-print_log "\n *** Modifying env_*.xml  ***"
+print_log "\n*** Modifying env_*.xml  ***"
 cd $CASEDIR
 
 # Set directory structure
@@ -201,12 +201,8 @@ fi
 # Set up the case (creates user_nl_xxx)
 #==========================================
 
-print_log "\n *** Running case.setup ***"
+print_log "\n*** Running case.setup ***"
 ./case.setup -r | tee -a $logfile
-
-print_log "\n *** Downloading missing inputdata (if needed) ***"
-print_log "*** Consider transferring new data to PROJECT, e.g. rsync -av ${SCRATCH}/CCLM2_inputdata /project/${PROJ}/shared/CCLM2_inputdata ***"
-./check_input_data --download
 
 
 #==========================================
@@ -215,7 +211,7 @@ print_log "*** Consider transferring new data to PROJECT, e.g. rsync -av ${SCRAT
 # Paramfile: can be exchanged for newer versions
 # Domainfile: has to be provided to DATM
 #==========================================
-print_log "\n *** Modifying user_nl_*.xml  ***"
+print_log "\n*** Modifying user_nl_*.xml  ***"
 
 if [ $DOMAIN == eur ]; then
 cat >> user_nl_clm << EOF
@@ -307,7 +303,7 @@ print_log "h3: selected variables, 6-hourly values (-6), daily file (4 vals per 
 #==========================================
 
 if [[ $COMPILER =~ "oasis" ]]; then
-    print_log "\n *** Adding OASIS routines ***"
+    print_log "\n*** Adding OASIS routines ***"
     ln -sf $CCLM2ROOT/cesm2_oas/src/oas/* SourceMods/src.drv/
     rm SourceMods/src.drv/oas_clm_vardef.F90
     ln -sf $CCLM2ROOT/cesm2_oas/src/drv/* SourceMods/src.drv/
@@ -320,7 +316,7 @@ fi
 # Build
 #==========================================
 
-print_log "\n *** Building case ***"
+print_log "\n*** Building case ***"
 ./case.build --clean-all | tee -a $logfile
 
 if [ $CODE == clm5.0_features ]; then
@@ -329,7 +325,16 @@ else
     ./case.build | tee -a $logfile
 fi
 
-print_log "\n *** Finished building new case in ${CASEDIR} ***"
+print_log "\n*** Finished building new case in ${CASEDIR} ***"
+
+
+#==========================================
+# Check and download input data
+#==========================================
+
+print_log "\n*** Downloading missing inputdata (if needed) ***"
+print_log "Consider transferring new data to PROJECT, e.g. rsync -av ${SCRATCH}/CCLM2_inputdata /project/${PROJ}/shared/CCLM2_inputdata"
+./check_input_data --download
 
 
 #==========================================
@@ -338,7 +343,7 @@ print_log "\n *** Finished building new case in ${CASEDIR} ***"
 #==========================================
 
 if [[ $COMPILER =~ "oasis" ]]; then
-    print_log "\n *** Adding OASIS_dummy files ***"
+    print_log "\n*** Adding OASIS_dummy files ***"
     
     # Copy the streams file (used for any domain and resolution)
     cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/OASIS.stream.txt run/
@@ -361,10 +366,10 @@ fi
 # Preview and submit job
 #==========================================
 
-print_log "\n *** Preview the run ***"
+print_log "\n*** Preview the run ***"
 ./preview_run | tee -a $logfile
 
-print_log "\n *** Submitting job ***"
+print_log "\n*** Submitting job ***"
 ./case.submit -a "-C gpu" | tee -a $logfile
 
 # fails for clm5.0_features because tasks-per-node evaluates to float (12.0) with python 3. Cannot find where the calculation is made. Can also not override it like this:
@@ -376,11 +381,11 @@ squeue --user=$USER | tee -a $logfile
 
 enddate=`date +'%Y-%m-%d %H:%M:%S'`
 duration=$SECONDS
-print_log "\n Started at: $startdate"
+print_log "Started at: $startdate"
 print_log "Finished at: $enddate"
 print_log "Duration to create, setup, build, submit: $(($duration / 60)) min $(($duration % 60)) sec"
 
-print_log "\n *** Check the job: squeue --user=${USER} ***"
+print_log "\n*** Check the job: squeue --user=${USER} ***"
 print_log "*** Check the case: in ${CASEDIR}, run less CaseStatus ***"
 print_log "*** Output at: ${CESMOUTPUTROOT}, run less CaseStatus ***"
 
