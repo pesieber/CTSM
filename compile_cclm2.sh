@@ -344,6 +344,7 @@ if [[ $COMPILER =~ "oasis" ]]; then
     
     # Copy the streams file (used for any domain and resolution)
     cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/OASIS.stream.txt run/
+    cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/datm.streams.txt.co2tseries.20tr run/
     
     # Manually modify datm_in to contain OASIS streams (cannot be done with user_nl_datm)
     sed -i -e '/dtlimit/,$d' run/datm_in # keep first part of generated datm_in (until domainfile path), modify in place
