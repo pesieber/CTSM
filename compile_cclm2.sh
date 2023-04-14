@@ -32,7 +32,11 @@ DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
-PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
+if [[ ${CCLM2_TEST} == true ]]; then
+    PROJ=sm61
+else
+    PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
+fi
 NTASKS=24
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
 let "NCORES = $NTASKS * 12"
@@ -148,14 +152,25 @@ fi
 
 # Set the number of cores and nodes (env_mach_pes.xml)
 ./xmlchange COST_PES=$NCORES
-./xmlchange NTASKS_CPL=-$NTASKS
-./xmlchange NTASKS_ATM=-$NTASKS
-./xmlchange NTASKS_OCN=-$NTASKS
-./xmlchange NTASKS_WAV=-$NTASKS
-./xmlchange NTASKS_GLC=-$NTASKS
-./xmlchange NTASKS_ICE=-$NTASKS
-./xmlchange NTASKS_ROF=-$NTASKS
-./xmlchange NTASKS_LND=-$NTASKS 
+if [[ ${CCLM2_TEST} == true ]]; then
+    ./xmlchange NTASKS_CPL=$NTASKS
+    ./xmlchange NTASKS_ATM=$NTASKS
+    ./xmlchange NTASKS_OCN=$NTASKS
+    ./xmlchange NTASKS_WAV=$NTASKS
+    ./xmlchange NTASKS_GLC=$NTASKS
+    ./xmlchange NTASKS_ICE=$NTASKS
+    ./xmlchange NTASKS_ROF=$NTASKS
+    ./xmlchange NTASKS_LND=$NTASKS 
+else
+    ./xmlchange NTASKS_CPL=-$NTASKS
+    ./xmlchange NTASKS_ATM=-$NTASKS
+    ./xmlchange NTASKS_OCN=-$NTASKS
+    ./xmlchange NTASKS_WAV=-$NTASKS
+    ./xmlchange NTASKS_GLC=-$NTASKS
+    ./xmlchange NTASKS_ICE=-$NTASKS
+    ./xmlchange NTASKS_ROF=-$NTASKS
+    ./xmlchange NTASKS_LND=-$NTASKS 
+fi
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
 #./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
@@ -375,6 +390,9 @@ fi
 # ========================================
 if [[ ${CCLM2_TEST} == true ]]; then
     rsync -av ${CLMROOT}/CCLM2_test_sandbox/ $CASEDIR/run/
+    rsync -av /project/sm61/leclairm/cosmo_test_sandbox_inputdata/ $CASEDIR/run/input/
+    cd $CASEDIR/run
+    ln -s cesm_${COMPILERNAME}_env.sh cesm_env.sh
     exit 0
 fi
 
