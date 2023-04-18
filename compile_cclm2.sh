@@ -11,12 +11,12 @@ set -e # failing commands will cause the shell script to exit
 # Case settings
 #==========================================
 
+date_1=$(date +'%Y-%m-%d %H:%M:%S')
+
 echo "*** Setting up case ***"
 
 CCLM2_TEST=true
 
-date=`date +'%Y%m%d-%H%M'` # get current date and time
-startdate=`date +'%Y-%m-%d %H:%M:%S'`
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
 RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
@@ -25,7 +25,12 @@ CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, 
 COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 
-EXP=cclm2_${date} # custom case name
+if [[ ${CCLM2_TEST} == true ]]; then
+    EXP="cclm2_test" # custom case name
+else
+    EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name
+fi
+
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$DOMAIN.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
@@ -71,7 +76,7 @@ print_log "*** Logfile at: ${logfile} ***"
 
 # Sync inputdata on scratch because scratch will be cleaned every month (change inputfiles on $PROJECT!)
 print_log "*** Syncing inputdata on scratch  ***"
-rsync -rv --ignore-existing /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile
+rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile
 #sbatch --account=$PROJ --export=ALL,PROJ=$PROJ transfer_clm_inputdata.sh # xfer job to prevent overflowing the loginnode
 
 
@@ -143,45 +148,42 @@ if [[ ${CCLM2_TEST} == true ]]; then
 else
     ./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
 fi
-./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48 # coupling freq default 30min = day,48
+# coupling freq default 30min = day,48
+./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48
+
+
+YYYY=${STARTDATE:0:4}
 if [ $CODE == CTSMdev ] && [ $DRIVER == nuopc ]; then
-    ./xmlchange DATM_YR_START=2004,DATM_YR_END=2004,DATM_YR_ALIGN=2004 # new variable names in CTSMdev with nuopc driver
+    # new variable names in CTSMdev with nuopc driver
+    ./xmlchange DATM_YR_START=${YYYY},DATM_YR_END=${YYYY},DATM_YR_ALIGN=${YYYY}
 else
-    ./xmlchange DATM_CLMNCEP_YR_START=2004,DATM_CLMNCEP_YR_END=2004,DATM_CLMNCEP_YR_ALIGN=2004 # in clm5.0 and CLM_features, with any driver
+    # in clm5.0 and CLM_features, with any driver
+    ./xmlchange DATM_CLMNCEP_YR_START=${YYYY},DATM_CLMNCEP_YR_END=${YYYY},DATM_CLMNCEP_YR_ALIGN=${YYYY}
 fi
 
 # Set the number of cores and nodes (env_mach_pes.xml)
 ./xmlchange COST_PES=$NCORES
-if [[ ${CCLM2_TEST} == true ]]; then
-    ./xmlchange NTASKS_CPL=$NTASKS
-    ./xmlchange NTASKS_ATM=$NTASKS
-    ./xmlchange NTASKS_OCN=$NTASKS
-    ./xmlchange NTASKS_WAV=$NTASKS
-    ./xmlchange NTASKS_GLC=$NTASKS
-    ./xmlchange NTASKS_ICE=$NTASKS
-    ./xmlchange NTASKS_ROF=$NTASKS
-    ./xmlchange NTASKS_LND=$NTASKS 
-else
-    ./xmlchange NTASKS_CPL=-$NTASKS
-    ./xmlchange NTASKS_ATM=-$NTASKS
-    ./xmlchange NTASKS_OCN=-$NTASKS
-    ./xmlchange NTASKS_WAV=-$NTASKS
-    ./xmlchange NTASKS_GLC=-$NTASKS
-    ./xmlchange NTASKS_ICE=-$NTASKS
-    ./xmlchange NTASKS_ROF=-$NTASKS
-    ./xmlchange NTASKS_LND=-$NTASKS 
-fi
+[[ ${CCLM2_TEST} == true ]] && NT=$NTASKS || NT=-$NTASKS
+for COMP in CPL ATM OCN WAV GLC ICE ROF LND; do
+    ./xmlchange NTASKS_$COMP=$NT
+done
+
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
 #./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
 
 # Activate debug mode (env_build.xml)
+if [[ ${CCLM2_TEST} == true ]]; then
+    ./xmlchange DEBUG=TRUE
+    ./xmlchange INFO_DBUG=3 # Change amount of output
+fi
+
 #./xmlchange DEBUG=TRUE
 #./xmlchange INFO_DBUG=2 # Change amount of output
 
 # Additional options
 #./xmlchange CLM_BLDNML_OPTS="-irrig .true." -append # switch on irrigation
-#./xmlchange CCSM_BGC=CO2A,CLM_CO2_TYPE=diagnostic,DATM_CO2_TSERIES=20tr # set transient CO2
+# ./xmlchange CCSM_BGC=CO2A,CLM_CO2_TYPE=diagnostic,DATM_CO2_TSERIES=20tr # set transient CO2
 
 #./xmlchange CLM_NAMELIST_OPTS="use_init_interp=.false. # Ronny sets interp to false, not sure about this
 
@@ -366,12 +368,11 @@ print_log "*** Finished building new case in ${CASEDIR} ***"
 # These files are required by DATM to use the forcing from COSMO instad of GSWP 
 #==========================================
 
-if [[ $COMPILER =~ "oasis" ]]; then
+if [[ $COMPILER =~ "oasis"  && ${CCLM2_TEST} != true ]]; then
     print_log "*** Adding OASIS_dummy files ***"
     
     # Copy the streams file (used for any domain and resolution)
     cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/OASIS.stream.txt run/
-    cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/datm.streams.txt.co2tseries.20tr run/
     
     # Manually modify datm_in to contain OASIS streams (cannot be done with user_nl_datm)
     sed -i -e '/dtlimit/,$d' run/datm_in # keep first part of generated datm_in (until domainfile path), modify in place
@@ -415,10 +416,10 @@ print_log "*** Submitting job ***"
 squeue --user=$USER | tee -a $logfile
 #less CaseStatus
 
-enddate=`date +'%Y-%m-%d %H:%M:%S'`
+date_2=$(date +'%Y-%m-%d %H:%M:%S')
 duration=$SECONDS
-print_log "Started at: $startdate"
-print_log "Finished at: $enddate"
+print_log "Started at: ${date_1}"
+print_log "Finished at: ${date_2}"
 print_log "Duration to create, setup, build, submit: $(($duration / 60)) min $(($duration % 60)) sec"
 
 print_log "*** Check the job: squeue --user=${USER} ***"
