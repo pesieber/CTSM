@@ -35,6 +35,7 @@ NTASKS=2 # will be nr of NODES (was 24)
 let "NCORES = $NTASKS * 12" # this will be nr of CPUS
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
 STARTDATE="2004-01-01"
+NYEARS=1
 
 # Set directories
 export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
