@@ -15,7 +15,7 @@ date_1=$(date +'%Y-%m-%d %H:%M:%S')
 
 echo "*** Setting up case ***"
 
-CCLM2_TEST=true
+[[ "$1" == "test" ]] && CCLM2_TEST=true || CCLM2_TEST=fasle
 
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
 RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
@@ -42,9 +42,9 @@ if [[ ${CCLM2_TEST} == true ]]; then
 else
     PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
 fi
-NTASKS=24
+NNODES=2
+NTASKS=$(( NNODES * 12 ))
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
-let "NCORES = $NTASKS * 12"
 if [[ ${CCLM2_TEST} == true ]]; then
     STARTDATE="2011-01-01"
     NSECONDS=86400
@@ -160,10 +160,11 @@ else
 fi
 
 # Set the number of cores and nodes (env_mach_pes.xml)
-./xmlchange COST_PES=$NCORES
-[[ ${CCLM2_TEST} == true ]] && NT=$NTASKS || NT=-$NTASKS
+./xmlchange COST_PES=$NTASKS
 for COMP in CPL ATM OCN WAV GLC ICE ROF LND; do
-    ./xmlchange NTASKS_$COMP=$NT
+    # - ML - don't understand how this setting works
+    #        in doubt, use $NTASKS instead of -$NNODES
+    ./xmlchange NTASKS_$COMP=-$NNODES
 done
 
 
