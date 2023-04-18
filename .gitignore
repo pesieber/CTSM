@@ -4,7 +4,6 @@
 transfer_clm_inputdata.err
 transfer_clm_inputdata.out
 
-
 # directories checked out by manage_externals, and other files created
 # by manage_externals
 manage_externals.log

@@ -15,22 +15,22 @@ echo "*** Setting up case ***"
 
 date=`date +'%Y%m%d-%H%M'` # get current date and time
 startdate=`date +'%Y-%m-%d %H:%M:%S'`
-COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
-RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
-DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
+COMPSET=I2000Clm50SpRs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
+RES=f09_g17 # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
+DOMAIN=glob # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
+CODE=CTSMdev # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
 
-CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILER=gnu # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 
 EXP=cclm2_${date} # custom case name
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$DOMAIN.$EXP
 
-DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
+DRIVER=nuopc # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (at least 8.4.1)
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
-PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
+PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/s1207)
 NTASKS=2 # will be nr of NODES (was 24)
 let "NCORES = $NTASKS * 12" # this will be nr of CPUS
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
@@ -59,8 +59,8 @@ print_log "*** Logfile at: ${logfile} ***"
 
 # Sync inputdata on scratch because scratch will be cleaned every month (change inputfiles on $PROJECT!)
 print_log "\n*** Syncing inputdata on scratch  ***"
-rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content
-#sbatch --account=$PROJ --export=ALL,PROJ=$PROJ transfer_clm_inputdata.sh # xfer job to prevent overflowing the loginnode
+#rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content
+sbatch --account=$PROJ --export=ALL,PROJ=$PROJ transfer_clm_inputdata.sh # xfer job to prevent overflowing the loginnode
 
 
 #==========================================
@@ -85,11 +85,28 @@ if [[ $COMPILER =~ "oasis" ]]; then
     print_log "OASIS at: ${OASIS_PATH}"
 fi
 
-# Find spack_esmf installation (used in .cime/config_machines.xml and env_build.xml)
+# Find spack_esmf installation  (used in .cime/config_machines.xml and env_build.xml) and path of netcdf files
 if [ $DRIVER == nuopc ]; then
     print_log "\n *** Finding spack_esmf ***"
-    export ESMF_PATH=$(spack location -i esmf@8.2.0%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/esmf-8.1.1/gcc-9.3.0/3iv2xwhfgfv7fzpjjayc5wyk5osio5c4
+    export ESMF_PATH=$(spack location -i esmf@8.4.1) # e.g. /project/s1207/ivanderk/spack-install/cray-cnl7-haswell/gcc-9.3.0/esmf-8.4.1-esftqomee2sllfsmjevw3f7cet6tbeb4/
     print_log "ESMF at: ${ESMF_PATH}"
+
+    # direct to spack installation of ESMF (also in .cime/config_compilers.xml - but doesn't work yet for Inne)
+    export ESMFMKFILE=${ESMF_PATH}/lib/esmf.mk
+    print_log "*** ESMFMKFILE: ${ESMFMKFILE} ***"
+
+ 
+    # add the netcdf_c and netcdf_fortran libraries to LD_LIBRARY_PATH so that cesm can find them during execution -- this can be done in cmake_macros or .cime/config_compilers.xml, but this file does not yet include specific settings for the gnu compiler.
+    
+    # soft coded defenition -- not working yet, instead use hard coded copy below
+    #export NETCDF_LIB_PATH=$(spack location -i netcdf-c@4.9.0%gcc@9.3.0)/lib/:$(spack location -i netcdf-c@4.9.0%gcc@9.3.0)/lib/
+    #export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${NETCDF_LIB_PATH}
+
+    # hard codedlibary path to NETCDF libraries on daint
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/project/s1207/ivanderk/spack-install/cray-cnl7-haswell/gcc-9.3.0/netcdf-c-4.9.0-tlmjuoss2bcmoyfnk3ycwzlfroeroom5/lib/:/project/s1207/ivanderk/spack-install/cray-cnl7-haswell/gcc-9.3.0/netcdf-fortran-4.6.0-yixrbitaoluai7ra737ei4wtb7rgaxwk/lib/
+    
+    print_log "*** LD_LIBRARY_PATH: ${LD_LIBRARY_PATH} ***"
+
 fi
 
 
