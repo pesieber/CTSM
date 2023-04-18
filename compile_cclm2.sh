@@ -16,7 +16,7 @@ echo "*** Setting up case ***"
 date=`date +'%Y%m%d-%H%M'` # get current date and time
 startdate=`date +'%Y-%m-%d %H:%M:%S'`
 COMPSET=I2000Clm50SpRs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
-RES=f09_g17 #f09_g17 # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
+RES=f09_g17 #hcru_hcru_mt13 #f09_g17 # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
 DOMAIN=glob # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 CODE=CTSMdev # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
 
@@ -92,7 +92,7 @@ if [ $DRIVER == nuopc ]; then
     print_log "ESMF at: ${ESMF_PATH}"
 
     # direct to spack installation of ESMF (also in .cime/config_compilers.xml - but doesn't work yet for Inne)
-    export ESMFMKFILE=${ESMF_PATH}/lib/esmf.mk
+    #export ESMFMKFILE=${ESMF_PATH}/lib/esmf.mk
     print_log "*** ESMFMKFILE: ${ESMFMKFILE} ***"
 
  
