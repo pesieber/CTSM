@@ -10,8 +10,8 @@
     nhour_restart = 0, 2, 1
     ngribout = 4
     itype_gather = 2
-    ydir_restart_in = 'output/restart'
-    ydir_restart_out = 'output/restart'
+    ydir_restart_in = 'cosmo_output/restart'
+    ydir_restart_out = 'cosmo_output/restart'
     yform_restart = 'nc-4'
     ytunit_restart = 'd'
     lbdclim = .true.
@@ -24,10 +24,10 @@
 
 &gribin
     lbdana = .false.
-    ydirini = 'input'
+    ydirini = 'cosmo_input'
     lchkini = .true.
     hincbound = 6
-    ydirbd = 'input'
+    ydirbd = 'cosmo_input'
     lchkbd = .true.
     lana_qi = .true.
     llb_qi = .true.
@@ -63,7 +63,7 @@
     lcheck = .false.
     luvmasspoint = .false.
     lwrite_const = .true.
-    ydir = 'output/bc'
+    ydir = 'cosmo_output/bc'
     l_z_filter = .false.
     l_p_filter = .false.
     l_fi_pmsl_smooth = .false.
@@ -85,7 +85,7 @@
     lcheck = .true.
     luvmasspoint = .false.
     lwrite_const = .false.
-    ydir = 'output/1h_2D'
+    ydir = 'cosmo_output/1h_2D'
     l_z_filter = .false.
     l_p_filter = .false.
     l_fi_pmsl_smooth = .false.
@@ -104,7 +104,7 @@
     lcheck = .false.
     luvmasspoint = .false.
     lwrite_const = .false.
-    ydir = 'output/2h_3D_zlev'
+    ydir = 'cosmo_output/2h_3D_zlev'
     l_z_filter = .false.
     l_p_filter = .false.
     l_fi_pmsl_smooth = .false.
@@ -122,7 +122,7 @@
     lcheck = .false.
     luvmasspoint = .false.
     lwrite_const = .false.
-    ydir = 'output/2h'
+    ydir = 'cosmo_output/2h'
     l_z_filter = .false.
     l_p_filter = .false.
     l_fi_pmsl_smooth = .false.

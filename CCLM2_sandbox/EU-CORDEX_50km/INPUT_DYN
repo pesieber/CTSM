@@ -1,5 +1,5 @@
 &dynctl
-    lcpp_dycore = .false.
+    lcpp_dycore = .true.
     lspubc = .true.
     itype_spubc = 3
     rdheight = 11000

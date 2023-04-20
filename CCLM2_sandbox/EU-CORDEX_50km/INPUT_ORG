@@ -24,8 +24,8 @@
     ldiagnos = .true.
     luse_rttov = .false.
     ldfi = .false.
-    nprocx = 6
-    nprocy = 4
+    nprocx = 2
+    nprocy = 2
     nprocio = 0
     num_asynio_comm = 0
     num_iope_percomm = 0
