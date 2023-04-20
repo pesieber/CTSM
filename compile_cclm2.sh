@@ -1,11 +1,10 @@
-#! /bin/bash
+#!/bin/bash
 
 # Script to compile CLM with case-specific settings
 # For standalone CLM or coupling with COSMO (for coupling set COMPILER=MY_COMPILER-oasis)
-# Domain can be global or EURO-CORDEX (set DOMAIN=eur, requires domain and mapping files) 
+# Domain can be global or regional (set DOMAIN=eur/sa, requires domain file and surface dataset for the desired grid)
 
 set -e # failing commands will cause the shell script to exit
-
 
 #==========================================
 # Case settings
@@ -16,15 +15,14 @@ date_1=$(date +'%Y-%m-%d %H:%M:%S')
 echo "*** Setting up case ***"
 
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
-RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
-
+RES=CLM_USRDAT # CLM_USRDAT (custom resolution defined by domain file) for CCLM2, f09_g17 (0.9x1.25) to test glob (inputdata downloaded)
+GRID=0.1 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=nvhpc-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
-COMPILERNAME=nvhpc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
+COMPILER=gnu # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name
-
-CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$DOMAIN.$EXP
+CASENAME=$CODE.$COMPILER.$COMPSET.$DOMAIN.$RES.$GRID.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
 MACH=pizdaint
@@ -36,7 +34,6 @@ NTASKS=$(( NNODES * 12 ))
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
 STARTDATE="2004-01-01"
 NYEARS=1
-
 
 # Set directories
 export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
@@ -60,7 +57,7 @@ print_log "*** Logfile at: ${logfile} ***"
 
 # Sync inputdata on scratch because scratch will be cleaned every month (change inputfiles on $PROJECT!)
 print_log "\n*** Syncing inputdata on scratch  ***"
-rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content
+rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content (there are many unnecessary files now so we may want to clean up!)
 #sbatch --account=$PROJ --export=ALL,PROJ=$PROJ transfer_clm_inputdata.sh # xfer job to prevent overflowing the loginnode
 
 
@@ -87,6 +84,7 @@ if [[ $COMPILER =~ "oasis" ]]; then
 fi
 
 # Find spack_esmf installation (used in .cime/config_machines.xml and env_build.xml)
+# Running with esmf@8.4.1 available with spack but not c2sm-spack
 if [ $DRIVER == nuopc ]; then
     print_log "\n *** Finding spack_esmf ***"
     export ESMF_PATH=$(spack location -i esmf@8.2.0%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/esmf-8.1.1/gcc-9.3.0/3iv2xwhfgfv7fzpjjayc5wyk5osio5c4
@@ -126,10 +124,7 @@ cd $CASEDIR
 ./xmlchange RESUBMIT=$NSUBMIT
 ./xmlchange RUN_STARTDATE=$STARTDATE
 ./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
-# coupling freq default 30min = day,48
-./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48
-
-
+./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48 # coupling freq default 30min = day,48
 YYYY=${STARTDATE:0:4}
 if [ $CODE == CTSMdev ] && [ $DRIVER == nuopc ]; then
     # new variable names in CTSMdev with nuopc driver
@@ -139,14 +134,17 @@ else
     ./xmlchange DATM_CLMNCEP_YR_START=${YYYY},DATM_CLMNCEP_YR_END=${YYYY},DATM_CLMNCEP_YR_ALIGN=${YYYY}
 fi
 
+# Additional options
+./xmlchange CCSM_BGC=CO2A,CLM_CO2_TYPE=diagnostic,DATM_CO2_TSERIES=20tr # historical transient CO2 sent from atm to land (as for LUCAS); default is CLM_CO2_TYPE=constant, co2_ppmv = 367.0
+#./xmlchange use_lai_streams = .true. # default is false (climatology as for LUCAS) 
+
 # Set the number of cores and nodes (env_mach_pes.xml)
-./xmlchange COST_PES=$NTASKS
+./xmlchange COST_PES=$NTASKS # ML - was NCORES
 for COMP in CPL ATM OCN WAV GLC ICE ROF LND; do
     # - ML - don't understand how this setting works
     #        in doubt, use $NTASKS instead of -$NNODES
-    ./xmlchange NTASKS_$COMP=-$NNODES
+    ./xmlchange NTASKS_$COMP=-$NNODES # ML - was NTASKS
 done
-
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
 #./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
@@ -158,46 +156,35 @@ done
 #./xmlchange DEBUG=TRUE
 #./xmlchange INFO_DBUG=2 # Change amount of output
 
-# Additional options
-#./xmlchange CLM_BLDNML_OPTS="-irrig .true." -append # switch on irrigation
-# ./xmlchange CCSM_BGC=CO2A,CLM_CO2_TYPE=diagnostic,DATM_CO2_TSERIES=20tr # set transient CO2
+# Domain and mapping files for regional cases
+GRIDNAME=${DOMAIN}_${GRID} # needed if RES=CLM_USRDAT
+./xmlchange CLM_USRDAT_NAME=$GRIDNAME
 
-#./xmlchange CLM_NAMELIST_OPTS="use_init_interp=.false. # Ronny sets interp to false, not sure about this
-
-# Domain and mapping files for limited spatial extent
 if [ $DOMAIN == eur ]; then
-    ./xmlchange LND_DOMAIN_PATH="$CESMDATAROOT/CCLM2_EUR_inputdata/domain"
-    ./xmlchange LND_DOMAIN_FILE="domain_EU-CORDEX_0.5_lon360.nc"
+    REGDOMAIN_PATH="$CESMDATAROOT/CCLM2_EUR_inputdata/domain"
+    REGDOMAIN_FILE="domain_EU-CORDEX_${GRID}_lon360.nc"
 fi
 
 if [ $DOMAIN == sa ]; then
-    ./xmlchange LND_DOMAIN_PATH="$CESMDATAROOT/CCLM2_SA_inputdata/domain"
-    ./xmlchange LND_DOMAIN_FILE="domain.lnd.360x720_SA-CORDEX_cruncep.100429.nc"
+    REGDOMAIN_PATH="$CESMDATAROOT/CCLM2_SA_inputdata/domain"
+    REGDOMAIN_FILE="domain.lnd.360x720_SA-CORDEX_cruncep.100429.nc"
 fi
 
 if [ $DOMAIN == eur ] || [ $DOMAIN == sa ]; then
-    ./xmlchange LND2ROF_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_nomask_to_0.5x0.5_nomask_aave_da_c130103.nc"
-    ./xmlchange ROF2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_0.5x0.5_nomask_to_360x720_nomask_aave_da_c120830.nc"
-    ./xmlchange LND2GLC_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc"
-    ./xmlchange LND2GLC_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc"
-    ./xmlchange GLC2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
-    ./xmlchange GLC2LND_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
-    ./xmlchange MOSART_MODE=NULL # turn off MOSART for the moment because it runs globally
+    ./xmlchange LND_DOMAIN_PATH=$REGDOMAIN_PATH,ATM_DOMAIN_PATH=$REGDOMAIN_PATH # have to be identical for LND and ATM
+    ./xmlchange LND_DOMAIN_FILE=$REGDOMAIN_FILE,ATM_DOMAIN_FILE=$REGDOMAIN_FILE
+    ./xmlchange MOSART_MODE=NULL # turn off MOSART because it runs globally
+    # Not needed for stub/off components (these files are global)
+    #./xmlchange LND2GLC_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc" 
+    #./xmlchange LND2GLC_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc"
+    #./xmlchange GLC2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
+    #./xmlchange GLC2LND_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
+    #./xmlchange LND2ROF_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_nomask_to_0.5x0.5_nomask_aave_da_c130103.nc"
+    #./xmlchange ROF2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_0.5x0.5_nomask_to_360x720_nomask_aave_da_c120830.nc" 
 fi
 
-# Still global
-#./xmlchange LND2ROF_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_nomask_to_0.5x0.5_nomask_aave_da_c130103.nc"
-#./xmlchange ROF2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_0.5x0.5_nomask_to_360x720_nomask_aave_da_c120830.nc"
-
-# Not needed for stub components (?)
-#./xmlchange LND2GLC_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc"
-#./xmlchange LND2GLC_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc"
-#./xmlchange GLC2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
-#./xmlchange GLC2LND_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
-
-# ESMF interface and time manager (env_build.xml)
+# ESMF (env_build.xml)
 ./xmlchange --file env_build.xml --id COMP_INTERFACE --val $DRIVER # mct is default in clm5.0, nuopc is default in CTSMdev (requires ESMF installation); adding --driver mct to create_newcase adds everything needed
-
 if [ $DRIVER == mct ]; then    
     ./xmlchange --file env_build.xml --id USE_ESMF_LIB --val "FALSE" # FALSE is default in clm5.0; since cesm1_2 ESMF is no longer necessary to run with calendar=gregorian
 elif [ $DRIVER == nuopc ]; then
@@ -216,41 +203,29 @@ print_log "\n*** Running case.setup ***"
 #==========================================
 # User namelists (use cat >> to append)
 # Surface data: domain-specific
-# Paramfile: can be exchanged for newer versions
+# Paramfile: use default
 # Domainfile: has to be provided to DATM
 #==========================================
+
 print_log "\n*** Modifying user_nl_*.xml  ***"
 
-if [ $DOMAIN == eur ]; then
+if [ $GRIDNAME == eur_0.5 ]; then
 cat >> user_nl_clm << EOF
 fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.5x0.5_hist_16pfts_Irrig_CMIP6_simyr2000_c190418.nc"
-paramfile = "$CESMDATAROOT/CCLM2_EUR_inputdata/CLM5params/clm5_params.cpbiomass.c190103.nc"
 EOF
-cat >> user_nl_datm << EOF
-domainfile = "$CESMDATAROOT/CCLM2_EUR_inputdata/domain/domain_EU-CORDEX_0.5_lon360.nc"
+elif [ $GRIDNAME == eur_0.1 ]; then
+cat >> user_nl_clm << EOF
+fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.1x0.1_hist_16pfts_Irrig_CMIP6_simyr2000_c200915.nc"
 EOF
 fi
 
 if [ $DOMAIN == sa ]; then
 cat >> user_nl_clm << EOF
 fsurdat = "$CESMDATAROOT/CCLM2_SA_inputdata/surfdata/surfdata_360x720cru_SA-CORDEX_16pfts_Irrig_CMIP6_simyr2000_c170824.nc"
-paramfile = "$CESMDATAROOT/CCLM2_EUR_inputdata/CLM5params/clm5_params.cpbiomass.c190103.nc"
-EOF
-cat >> user_nl_datm << EOF
-domainfile = "$CESMDATAROOT/CCLM2_SA_inputdata/domain/domain.lnd.360x720_SA-CORDEX_cruncep.100429.nc"
 EOF
 fi
 
-# For global domain keep the defaults (downloaded from svn trunc)
-#if [ $DOMAIN == glob ]; then
-#cat >> user_nl_clm << EOF
-#fsurdat = "$CESMDATAROOT/cesm_inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_16pfts_Irrig_CMIP6_simyr2000_c170824.nc"
-#paramfile = "$CESMDATAROOT/cesm_inputdata/lnd/clm2/paramdata/clm5_params.c171117.nc"
-#EOF
-#cat >> user_nl_datm << EOF
-#domainfile = "$CESMDATAROOT/cesm_inputdata/share/domains/domain.clm/domain.lnd.360x720_cruncep.100429.nc"
-#EOF
-#fi
+# For global domain keep the defaults (downloaded from svn trunc to CESMDATAROOT/cesm_inputdata and reused)
 
 # Namelist options available in Ronny's code
 # requires additional variables in the surfdata, e.g. dbh for biomass_heat_storage
@@ -362,10 +337,10 @@ if [[ $COMPILER =~ "oasis" ]]; then
     sed -e '1,/domainfile/d' $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/datm_in_copy_streams >> run/datm_in # append second part of CCLM2 datm_in (anything after domainfile path)
     
     # Copy the OASIS dummy (domain and resolution specific)
-    if [ $DOMAIN == eur ] && [ $RES == hcru_hcru ]; then
-        cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/OASIS_dummy_0.5_lon360.nc run/OASIS_dummy.nc
+    if [ $DOMAIN == eur ]; then
+        cp $CESMDATAROOT/CCLM2_EUR_inputdata/OASIS_dummy_for_datm/OASIS_dummy_${GRID}_lon360.nc run/OASIS_dummy.nc
     else
-        raise error "OASIS_dummy.nc is missing for this domain and resolution" | tee -a $logfile
+        raise error "OASIS_dummy.nc is missing for this domain" | tee -a $logfile
     fi
 fi
 
