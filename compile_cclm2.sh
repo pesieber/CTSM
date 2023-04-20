@@ -17,23 +17,24 @@ echo "*** Setting up case ***"
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 RES=CLM_USRDAT # CLM_USRDAT (custom resolution defined by domain file) for CCLM2, f09_g17 (0.9x1.25) to test glob (inputdata downloaded)
-GRID=0.1 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
+GRID=0.5 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
 COMPILER=gnu # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name
-CASENAME=$CODE.$COMPILER.$COMPSET.$DOMAIN.$RES.$GRID.$EXP
+GRIDNAME=${DOMAIN}_${GRID}
+CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$GRIDNAME.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
-WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
-PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
-NNODES=2
-NTASKS=$(( NNODES * 12 ))
+WALLTIME="00:20:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
+PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (e.g. sm61)
+NNODES=2 # number of nodes
+NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
-STARTDATE="2004-01-01"
-NYEARS=1
+#NYEARS=1
+NHOURS=24 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
 
 # Set directories
 export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
@@ -70,6 +71,7 @@ rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfil
 # daint-gpu (although CLM will run on cpus)
 # PrgEnv-xxx (also switch compiler version if needed)
 # cray-mpich
+# cray-python
 # cray-netcdf-hdf5parallel
 # cray-hdf5-parallel
 # cray-parallel-netcdf
@@ -123,7 +125,8 @@ cd $CASEDIR
 ./xmlchange RUN_TYPE=startup
 ./xmlchange RESUBMIT=$NSUBMIT
 ./xmlchange RUN_STARTDATE=$STARTDATE
-./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
+#./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
+./xmlchange STOP_OPTION=nhours,STOP_N=$NHOURS # PS - for testing
 ./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48 # coupling freq default 30min = day,48
 YYYY=${STARTDATE:0:4}
 if [ $CODE == CTSMdev ] && [ $DRIVER == nuopc ]; then
@@ -138,13 +141,9 @@ fi
 ./xmlchange CCSM_BGC=CO2A,CLM_CO2_TYPE=diagnostic,DATM_CO2_TSERIES=20tr # historical transient CO2 sent from atm to land (as for LUCAS); default is CLM_CO2_TYPE=constant, co2_ppmv = 367.0
 #./xmlchange use_lai_streams = .true. # default is false (climatology as for LUCAS) 
 
-# Set the number of cores and nodes (env_mach_pes.xml)
-./xmlchange COST_PES=$NTASKS # ML - was NCORES
-for COMP in CPL ATM OCN WAV GLC ICE ROF LND; do
-    # - ML - don't understand how this setting works
-    #        in doubt, use $NTASKS instead of -$NNODES
-    ./xmlchange NTASKS_$COMP=-$NNODES # ML - was NTASKS
-done
+# Set the number of cores, nodes will be COST_PES/12 per default (env_mach_pes.xml)
+./xmlchange COST_PES=$NCORES # number of cores=CPUs
+./xmlchange NTASKS=$NCORES # number of tasks for each component (can be set with $NCORES or -$NNODES for same result)
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
 #./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
@@ -153,12 +152,10 @@ done
 # ./xmlchange DEBUG=TRUE
 # ./xmlchange INFO_DBUG=3 # Change amount of output
 
-#./xmlchange DEBUG=TRUE
-#./xmlchange INFO_DBUG=2 # Change amount of output
-
 # Domain and mapping files for regional cases
-GRIDNAME=${DOMAIN}_${GRID} # needed if RES=CLM_USRDAT
-./xmlchange CLM_USRDAT_NAME=$GRIDNAME
+if [ $RES == CLM_USRDAT ]; then 
+    ./xmlchange CLM_USRDAT_NAME=$GRIDNAME # needed if RES=CLM_USRDAT
+fi
 
 if [ $DOMAIN == eur ]; then
     REGDOMAIN_PATH="$CESMDATAROOT/CCLM2_EUR_inputdata/domain"
@@ -174,7 +171,7 @@ if [ $DOMAIN == eur ] || [ $DOMAIN == sa ]; then
     ./xmlchange LND_DOMAIN_PATH=$REGDOMAIN_PATH,ATM_DOMAIN_PATH=$REGDOMAIN_PATH # have to be identical for LND and ATM
     ./xmlchange LND_DOMAIN_FILE=$REGDOMAIN_FILE,ATM_DOMAIN_FILE=$REGDOMAIN_FILE
     ./xmlchange MOSART_MODE=NULL # turn off MOSART because it runs globally
-    # Not needed for stub/off components (these files are global)
+    # Not needed for stub/off components (these files are global), leave as default=idmap
     #./xmlchange LND2GLC_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc" 
     #./xmlchange LND2GLC_SMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_360x720_TO_gland4km_aave.170429.nc"
     #./xmlchange GLC2LND_FMAPNAME="$CESMDATAROOT/CCLM2_EUR_inputdata/mapping/map_gland4km_TO_360x720_aave.170429.nc"
@@ -280,6 +277,13 @@ print_log "h2: selected variables, daily values (-24), yearly file (365 vals per
 print_log "h3: selected variables, 6-hourly values (-6), daily file (4 vals per file), instantaneous at the output interval (I) by PFT"
 '
 
+# For testing: remove default history fields, only write a few daily (-24) or hourly (-1) (temperatures and surface fluxes SWdn, SWup, LWdn, LWup, SH, LH, G)
+cat >> user_nl_clm << EOF
+hist_empty_htapes = .true.
+hist_fincl1 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
+hist_nhtfrq = -1
+EOF
+
 
 #==========================================
 # For OASIS coupling: before building, add the additional routines for OASIS interface in your CASEDIR on scratch
@@ -316,7 +320,7 @@ print_log "\n*** Finished building new case in ${CASEDIR} ***"
 #==========================================
 
 print_log "\n*** Downloading missing inputdata (if needed) ***"
-print_log "Consider transferring new data to PROJECT, e.g. rsync -av ${SCRATCH}/CCLM2_inputdata /project/${PROJ}/shared/CCLM2_inputdata"
+print_log "Consider transferring new data to PROJECT, e.g. rsync -av ${SCRATCH}/CCLM2_inputdata/ /project/${PROJ}/shared/CCLM2_inputdata/"
 ./check_input_data --download
 
 
@@ -352,6 +356,9 @@ fi
 print_log "\n*** Preview the run ***"
 ./preview_run | tee -a $logfile
 
+print_log "*** Loaded modules for build from .cime, passed to env_mach_specific.xml, used for run ***"
+print_log "Check in ${CASEDIR}/software_environment.txt"
+
 print_log "\n*** Submitting job ***"
 ./case.submit -a "-C gpu" | tee -a $logfile
 
@@ -370,7 +377,7 @@ print_log "Duration to create, setup, build, submit: $(($duration / 60)) min $((
 
 print_log "\n*** Check the job: squeue --user=${USER} ***"
 print_log "*** Check the case: in ${CASEDIR}, run less CaseStatus ***"
-print_log "*** Output at: ${CESMOUTPUTROOT}, run less CaseStatus ***"
+print_log "*** Output at: ${CESMOUTPUTROOT} ***"
 
 
 #==========================================
