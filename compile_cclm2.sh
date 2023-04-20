@@ -15,21 +15,14 @@ date_1=$(date +'%Y-%m-%d %H:%M:%S')
 
 echo "*** Setting up case ***"
 
-[[ "$1" == "test" ]] && CCLM2_TEST=true || CCLM2_TEST=fasle
-
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
 RES=hcru_hcru # hcru_hcru for CCLM2-0.44, f09_g17 to test glob (inputdata downloaded)
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
-COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
-
-if [[ ${CCLM2_TEST} == true ]]; then
-    EXP="cclm2_test" # custom case name
-else
-    EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name
-fi
+COMPILER=nvhpc-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILERNAME=nvhpc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
+EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name
 
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$DOMAIN.$EXP
 
@@ -37,21 +30,12 @@ DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
-if [[ ${CCLM2_TEST} == true ]]; then
-    PROJ=sm61
-else
-    PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
-fi
+PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (sm61/sm62)
 NNODES=2
 NTASKS=$(( NNODES * 12 ))
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
-if [[ ${CCLM2_TEST} == true ]]; then
-    STARTDATE="2011-01-01"
-    NSECONDS=86400
-else
-    STARTDATE="2004-01-01"
-    NYEARS=1
-fi
+STARTDATE="2004-01-01"
+NYEARS=1
 
 
 # Set directories
@@ -98,7 +82,7 @@ rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfil
 # Find spack_oasis installation (used in .cime/config_compilers.xml)
 if [[ $COMPILER =~ "oasis" ]]; then
     print_log "\n*** Finding spack_oasis ***"
-    export OASIS_PATH=$(spack location -i oasis%$COMPILERNAME) # e.g. /project/sm61/psieber/spack-install/oasis/master/gcc/24obfvejulxnpfxiwatzmtcddx62pikc
+    export OASIS_PATH=$(spack location -i oasis%${COMPILERNAME}+fix_mct_conflict) # e.g. /project/sm61/psieber/spack-install/oasis/master/gcc/24obfvejulxnpfxiwatzmtcddx62pikc
     print_log "OASIS at: ${OASIS_PATH}"
 fi
 
@@ -141,11 +125,7 @@ cd $CASEDIR
 ./xmlchange RUN_TYPE=startup
 ./xmlchange RESUBMIT=$NSUBMIT
 ./xmlchange RUN_STARTDATE=$STARTDATE
-if [[ ${CCLM2_TEST} == true ]]; then
-    ./xmlchange STOP_OPTION=nseconds,STOP_N=$NSECONDS
-else
-    ./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
-fi
+./xmlchange STOP_OPTION=nyears,STOP_N=$NYEARS
 # coupling freq default 30min = day,48
 ./xmlchange NCPL_BASE_PERIOD="day",ATM_NCPL=48
 
@@ -172,10 +152,8 @@ done
 #./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
 
 # Activate debug mode (env_build.xml)
-if [[ ${CCLM2_TEST} == true ]]; then
-    ./xmlchange DEBUG=TRUE
-    ./xmlchange INFO_DBUG=3 # Change amount of output
-fi
+# ./xmlchange DEBUG=TRUE
+# ./xmlchange INFO_DBUG=3 # Change amount of output
 
 #./xmlchange DEBUG=TRUE
 #./xmlchange INFO_DBUG=2 # Change amount of output
@@ -372,7 +350,7 @@ print_log "Consider transferring new data to PROJECT, e.g. rsync -av ${SCRATCH}/
 # These files are required by DATM to use the forcing from COSMO instad of GSWP 
 #==========================================
 
-if [[ $COMPILER =~ "oasis" && ${CCLM2_TEST} != true ]]; then
+if [[ $COMPILER =~ "oasis" ]]; then
     print_log "\n*** Adding OASIS_dummy files ***"
     
     # Copy the streams file (used for any domain and resolution)
@@ -389,18 +367,6 @@ if [[ $COMPILER =~ "oasis" && ${CCLM2_TEST} != true ]]; then
     else
         raise error "OASIS_dummy.nc is missing for this domain and resolution" | tee -a $logfile
     fi
-fi
-
-# ========================================
-# CCLM2 test
-# Add cosmo namelists and submit scripts for the EU_CORDEX 50 km domain
-# ========================================
-if [[ ${CCLM2_TEST} == true ]]; then
-    rsync -av ${CLMROOT}/CCLM2_test_sandbox/ $CASEDIR/run/
-    rsync -av /project/sm61/leclairm/cosmo_test_sandbox_inputdata/ $CASEDIR/run/input/
-    cd $CASEDIR/run
-    ln -s cesm_${COMPILERNAME}_env.sh cesm_env.sh
-    exit 0
 fi
 
 
