@@ -33,6 +33,7 @@ PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (e.g. sm61)
 NNODES=2 # number of nodes
 NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
+STARTDATE="2004-01-01" # Used for DATM forcing (DATM streams files are required for this year), shouldn't matter for CCLM2 
 #NYEARS=1
 NHOURS=24 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
 
