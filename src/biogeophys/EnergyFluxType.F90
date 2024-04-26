@@ -405,8 +405,7 @@ contains
     this%eflx_lh_tot_patch(begp:endp) = spval
     call hist_addfld1d (fname='Qle', units='W/m^2',  &
          avgflag='A', long_name='total evaporation', &
-         ptr_patch=this%eflx_lh_tot_patch, c2l_scale_type='urbanf', &
-         default = 'inactive')
+         ptr_patch=this%eflx_lh_tot_patch, c2l_scale_type='urbanf')
 
     this%eflx_lh_tot_patch(begp:endp) = spval
     call hist_addfld1d (fname='EFLX_LH_TOT', units='W/m^2', &
@@ -534,7 +533,7 @@ contains
        this%eflx_gnet_patch(begp:endp) = spval
        call hist_addfld1d (fname='EFLX_GNET', units='W/m^2', &
             avgflag='A', long_name='net heat flux into ground', &
-            ptr_patch=this%eflx_gnet_patch, default='inactive', c2l_scale_type='urbanf')
+            ptr_patch=this%eflx_gnet_patch, c2l_scale_type='urbanf')
     end if 
 
     this%eflx_grnd_lake_patch(begp:endp) = spval

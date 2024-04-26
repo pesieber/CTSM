@@ -657,7 +657,7 @@ contains
     this%forc_t_not_downscaled_grc(begg:endg) = spval
     call hist_addfld1d (fname='Tair_from_atm', units='K',  &
          avgflag='A', long_name='atmospheric air temperature received from atmosphere (pre-downscaling)', &
-         ptr_gcell=this%forc_t_not_downscaled_grc, default='inactive')
+         ptr_gcell=this%forc_t_not_downscaled_grc)
 
     this%forc_t_downscaled_col(begc:endc) = spval
     call hist_addfld1d (fname='TBOT', units='K',  &

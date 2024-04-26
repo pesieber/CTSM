@@ -335,12 +335,12 @@ contains
     this%qflx_runoff_u_col(begc:endc) = spval
     call hist_addfld1d (fname='QRUNOFF_U', units='mm/s',  &
          avgflag='A', long_name='Urban total runoff', &
-         ptr_col=this%qflx_runoff_u_col, set_nourb=spval, c2l_scale_type='urbanf', default='inactive')
+         ptr_col=this%qflx_runoff_u_col, set_nourb=spval, c2l_scale_type='urbanf')
 
     this%qflx_runoff_r_col(begc:endc) = spval
     call hist_addfld1d (fname='QRUNOFF_R', units='mm/s',  &
          avgflag='A', long_name='Rural total runoff', &
-         ptr_col=this%qflx_runoff_r_col, set_spec=spval, default='inactive')
+         ptr_col=this%qflx_runoff_r_col, set_spec=spval)
 
     this%qflx_snow_drain_col(begc:endc) = spval
     call hist_addfld1d (fname='QFLX_SNOW_DRAIN',  units='mm/s',  &
@@ -472,7 +472,7 @@ contains
     this%qflx_evap_veg_patch(begp:endp) = spval
     call hist_addfld1d (fname='QFLX_EVAP_VEG', units='mm H2O/s', &
          avgflag='A', long_name='vegetation evaporation', &
-         ptr_patch=this%qflx_evap_veg_patch, default='inactive', c2l_scale_type='urbanf')
+         ptr_patch=this%qflx_evap_veg_patch, c2l_scale_type='urbanf')
 
     this%qflx_evap_tot_patch(begp:endp) = spval
     call hist_addfld1d (fname='QFLX_EVAP_TOT', units='kg m-2 s-1', &
