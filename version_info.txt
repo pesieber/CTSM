@@ -1,0 +1,21 @@
+release-clm5.0.35-23-g012cafb9a
+Processing externals description file : Externals.cfg
+Processing externals description file : Externals_CLM.cfg
+Processing externals description file : Externals_CISM.cfg
+Checking status of externals: clm, fates, ptclm, cism, source_cism, rtm, mosart, cime, doc-builder, 
+ M  ./cime
+        modified sandbox, on cime5.6.39
+    ./components/cism
+        clean sandbox, on cism-release-cesm2.1.2_02
+    ./components/cism/source_cism
+        clean sandbox, on release-cism2.1.03
+    ./components/mosart
+        clean sandbox, on release-cesm2.0.04
+    ./components/rtm
+        clean sandbox, on release-cesm2.0.04
+e-o ./doc/doc-builder
+        -, not checked out --> v1.0.4
+    ./src/fates
+        clean sandbox, on sci.1.30.0_api.8.0.0
+    ./tools/PTCLM
+        clean sandbox, on PTCLM2_20200902

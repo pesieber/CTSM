@@ -6,6 +6,8 @@
 
 set -e # failing commands will cause the shell script to exit
 
+ACCOUNT=s1256
+
 #==========================================
 # Case settings
 #==========================================
@@ -17,26 +19,26 @@ echo "*** Setting up case ***"
 COMPSET=I2000Clm50SpGs # I2000Clm50SpGs for release-clm5.0 (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_MOSART_SGLC_SWAV), I2000Clm50SpRs for CTSMdev (2000_DATM%GSWP3v1_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV), use SGLC for regional domain!
 DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 RES=CLM_USRDAT # CLM_USRDAT (custom resolution defined by domain file) for CCLM2, f09_g17 (0.9x1.25) to test glob (inputdata downloaded)
-GRID=0.5 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
+GRID=0.1 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILER=gnu # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 #EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name with date - PS for testing
-EXP="cclm2" # custom case name without date
+EXP="test_nfs_corr" # custom case name without date
 GRIDNAME=${DOMAIN}_${GRID}
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$GRIDNAME.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
-WALLTIME="04:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME, "00:20:00" for testing
-PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (e.g. sm61)
+WALLTIME="01:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME, "00:20:00" for testing
+PROJ=sm61 # extract project name (e.g. sm61)
 NNODES=2 # number of nodes
 NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
-STARTDATE="2000-01-01" # Used for DATM forcing (DATM streams files are required for this year), shouldn't matter for CCLM2 
+STARTDATE="2000-01-01"
 #NYEARS=1
-NHOURS=48 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
+NHOURS=24 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
 
 # Set directories
 export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
@@ -103,7 +105,7 @@ fi
 print_log "\n*** Creating CASE: ${CASENAME} ***"
 
 cd $CLMROOT/cime/scripts
-./create_newcase --case $CASEDIR --compset $COMPSET --res $RES --mach $MACH --compiler $COMPILER --driver $DRIVER --project $PROJ --run-unsupported | tee -a $logfile
+./create_newcase --case $CASEDIR --compset $COMPSET --res $RES --mach $MACH --compiler $COMPILER --driver $DRIVER --project $ACCOUNT --run-unsupported | tee -a $logfile
 
 
 #==========================================
@@ -121,7 +123,7 @@ cd $CASEDIR
 # Change job settings (env_batch.xml or env_workflow.xml). Do this here to change for both case.run and case.st_archive
 ./xmlchange JOB_QUEUE=$QUEUE --force
 ./xmlchange JOB_WALLCLOCK_TIME=$WALLTIME
-./xmlchange PROJECT=$PROJ
+./xmlchange PROJECT=$ACCOUNT
 
 # Set run start/stop options and DATM forcing (env_run.xml)
 ./xmlchange RUN_TYPE=startup
@@ -214,7 +216,7 @@ fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.5x0.5_hist_16pf
 EOF
 elif [ $GRIDNAME == eur_0.1 ]; then
 cat >> user_nl_clm << EOF
-fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.1x0.1_EUR_hist_16pfts_Irrig_CMIP6_simyr2005_c230523.nc"
+fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/feedbacks_dirk/surfdata_0.1x0.1_EUR_hist_16pfts_Irrig_CMIP6_simyr2005_c230523_eunisl3_nfs_corr.nc"
 EOF
 fi
 
@@ -258,38 +260,8 @@ fi
 # hist_type1d_pertape # Averaging for 1D vector output (when hist_dov2xy is false): average to 'GRID', 'LAND', 'COLS', 'PFTS'; ' ' for 2D and no averaging (i.e. PFT output)
 
 # Commented out during testing to avoid lots of output
-: '
-cat >> user_nl_clm << EOF
-hist_fincl1 = 'TG', 'QAF', 'TAF', 'UAF'
-hist_fincl2 = 'QAF', 'TAF', 'UAF', 'VPD_CAN', 'TLAI', 'FCEV', 'FCTR', 'TG', 'TSOI', 'TSOI_10CM', 'TSA', 'Q2M', 'VPD'
-hist_fincl3 = 'QAF', 'TAF', 'UAF', 'VPD_CAN', 'TLAI', 'FCEV', 'FCTR', 'TG', 'TSOI', 'TSOI_10CM', 'TSA', 'Q2M', 'VPD'
-hist_fincl4 = 'QAF', 'TAF', 'UAF', 'VPD_CAN', 'TLAI', 'FCEV', 'FCTR', 'TG', 'TSOI', 'TSOI_10CM', 'TSA', 'Q2M', 'VPD'
-
-hist_nhtfrq = 0, -24, -24, -6 
-hist_mfilt  = 12, 365, 365, 4 
-hist_avgflag_pertape = 'A','M','X','I' 
-hist_dov2xy = .true.,.true.,.true.,.false. 
-hist_type1d_pertape = ' ',' ',' ',' '
-EOF
-
-print_log "*** Output frequency and averaging  ***"
-print_log "h0: default + selected variables, monthly values (0), yearly file (12 vals per file), average over the output interval (A)"
-print_log "h1: selected variables, daily values (-24), yearly file (365 vals per file), min over the output interval (M)"
-print_log "h2: selected variables, daily values (-24), yearly file (365 vals per file), max over the output interval (X)"
-print_log "h3: selected variables, 6-hourly values (-6), daily file (4 vals per file), instantaneous at the output interval (I) by PFT"
-'
 
 # For testing: remove default history fields, only write a few daily (-24) or hourly (-1) (temperatures and surface fluxes SWdn, SWup, LWdn, LWup, SH, LH, G)
-cat >> user_nl_clm << EOF
-hist_empty_htapes = .true.
-hist_fincl1 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
-hist_fincl2 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
-hist_fincl3 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
-hist_nhtfrq = 0, 0, -24
-hist_mfilt  = 12, 12, 365
-hist_avgflag_pertape = 'A','A','X'
-hist_dov2xy = .true.,.false.,.true.
-EOF
 
 
 #==========================================
