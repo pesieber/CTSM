@@ -22,14 +22,14 @@ CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, 
 COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 #EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name with date - PS for testing
-EXP="cclm2" # custom case name without date
+EXP="cclm2_newVariables" # custom case name without date
 GRIDNAME=${DOMAIN}_${GRID}
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$GRIDNAME.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
-WALLTIME="04:00:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME, "00:20:00" for testing
+WALLTIME="00:20:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME, "00:20:00" for testing
 PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (e.g. sm61)
 NNODES=2 # number of nodes
 NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
