@@ -187,12 +187,12 @@ contains
          avgflag='A', long_name='10-m wind for dust model', &
          ptr_patch=this%u10_patch)
 
-    if (use_cn) then
-       this%ram1_patch(begp:endp) = spval
-       call hist_addfld1d (fname='RAM1', units='s/m', &
-            avgflag='A', long_name='aerodynamical resistance ', &
-            ptr_patch=this%ram1_patch)
-    end if
+    
+    this%ram1_patch(begp:endp) = spval
+    call hist_addfld1d (fname='RAM1', units='s/m', &
+         avgflag='A', long_name='aerodynamical resistance ', &
+         ptr_patch=this%ram1_patch)
+    
 
     if (use_cn) then
        this%fv_patch(begp:endp) = spval
@@ -201,33 +201,33 @@ contains
             ptr_patch=this%fv_patch, default='inactive')
     end if
 
-    if (use_cn) then
-       this%z0hv_patch(begp:endp) = spval
-       call hist_addfld1d (fname='Z0HV', units='m', &
-            avgflag='A', long_name='roughness length over vegetation, sensible heat', &
-            ptr_patch=this%z0hv_patch)
-    end if
+    
+    this%z0hv_patch(begp:endp) = spval
+    call hist_addfld1d (fname='Z0HV', units='m', &
+         avgflag='A', long_name='roughness length over vegetation, sensible heat', &
+         ptr_patch=this%z0hv_patch)
+    
 
-    if (use_cn) then
-       this%z0m_patch(begp:endp) = spval
-       call hist_addfld1d (fname='Z0M', units='m', &
-            avgflag='A', long_name='momentum roughness length', &
-            ptr_patch=this%z0m_patch)
-    end if
+    
+    this%z0m_patch(begp:endp) = spval
+    call hist_addfld1d (fname='Z0M', units='m', &
+         avgflag='A', long_name='momentum roughness length', &
+         ptr_patch=this%z0m_patch)
+    
 
-    if (use_cn) then
-       this%z0mv_patch(begp:endp) = spval
-       call hist_addfld1d (fname='Z0MV', units='m', &
-            avgflag='A', long_name='roughness length over vegetation, momentum', &
-            ptr_patch=this%z0mv_patch)
-    end if
+    
+    this%z0mv_patch(begp:endp) = spval
+    call hist_addfld1d (fname='Z0MV', units='m', &
+         avgflag='A', long_name='roughness length over vegetation, momentum', &
+         ptr_patch=this%z0mv_patch)
+    
 
-    if (use_cn) then
-       this%z0qv_patch(begp:endp) = spval
-       call hist_addfld1d (fname='Z0QV', units='m', &
-            avgflag='A', long_name='roughness length over vegetation, latent heat', &
-            ptr_patch=this%z0qv_patch)
-    end if
+    
+    this%z0qv_patch(begp:endp) = spval
+    call hist_addfld1d (fname='Z0QV', units='m', &
+         avgflag='A', long_name='roughness length over vegetation, latent heat', &
+         ptr_patch=this%z0qv_patch)
+    
 
     if (use_luna) then
        call hist_addfld1d (fname='RB10', units='s/m', &

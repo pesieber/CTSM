@@ -529,12 +529,12 @@ contains
             ptr_patch=this%cgrnds_patch, default='inactive', c2l_scale_type='urbanf')
     end if 
 
-    if (use_cn) then
-       this%eflx_gnet_patch(begp:endp) = spval
-       call hist_addfld1d (fname='EFLX_GNET', units='W/m^2', &
-            avgflag='A', long_name='net heat flux into ground', &
-            ptr_patch=this%eflx_gnet_patch, c2l_scale_type='urbanf')
-    end if 
+    
+    this%eflx_gnet_patch(begp:endp) = spval
+    call hist_addfld1d (fname='EFLX_GNET', units='W/m^2', &
+		 avgflag='A', long_name='net heat flux into ground', &
+		 ptr_patch=this%eflx_gnet_patch, c2l_scale_type='urbanf')
+     
 
     this%eflx_grnd_lake_patch(begp:endp) = spval
     call hist_addfld1d (fname='EFLX_GRND_LAKE', units='W/m^2', &
