@@ -19,23 +19,24 @@ DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 RES=CLM_USRDAT # CLM_USRDAT (custom resolution defined by domain file) for CCLM2, f09_g17 (0.9x1.25) to test glob (inputdata downloaded)
 GRID=0.5 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=gnu # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
-EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name
+#EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name with date - PS for testing
+EXP="cclm2_newVariables" # custom case name without date
 GRIDNAME=${DOMAIN}_${GRID}
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$GRIDNAME.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
 MACH=pizdaint
 QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
-WALLTIME="00:20:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME
+WALLTIME="00:20:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME, "00:20:00" for testing
 PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (e.g. sm61)
 NNODES=2 # number of nodes
 NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
-STARTDATE="2004-01-01" # Used for DATM forcing (DATM streams files are required for this year), shouldn't matter for CCLM2 
+STARTDATE="2000-01-01" # Used for DATM forcing (DATM streams files are required for this year), shouldn't matter for CCLM2 
 #NYEARS=1
-NHOURS=24 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
+NHOURS=48 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
 
 # Set directories
 export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
@@ -140,7 +141,7 @@ fi
 
 # Additional options
 ./xmlchange CCSM_BGC=CO2A,CLM_CO2_TYPE=diagnostic,DATM_CO2_TSERIES=20tr # historical transient CO2 sent from atm to land (as for LUCAS); default is CLM_CO2_TYPE=constant, co2_ppmv = 367.0
-#./xmlchange use_lai_streams = .true. # default is false (climatology as for LUCAS) 
+#./xmlchange use_lai_streams=.true. # default is false (climatology as for LUCAS); does not work with xmlchange, change manually in lnd_in
 
 # Set the number of cores, nodes will be COST_PES/12 per default (env_mach_pes.xml)
 ./xmlchange COST_PES=$NCORES # number of cores=CPUs
@@ -200,7 +201,7 @@ print_log "\n*** Running case.setup ***"
 
 #==========================================
 # User namelists (use cat >> to append)
-# Surface data: domain-specific
+# Surface data: domain-specific 
 # Paramfile: use default
 # Domainfile: has to be provided to DATM
 #==========================================
@@ -213,7 +214,7 @@ fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.5x0.5_hist_16pf
 EOF
 elif [ $GRIDNAME == eur_0.1 ]; then
 cat >> user_nl_clm << EOF
-fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.1x0.1_hist_16pfts_Irrig_CMIP6_simyr2000_c200915.nc"
+fsurdat = "$CESMDATAROOT/CCLM2_EUR_inputdata/surfdata/surfdata_0.1x0.1_EUR_hist_16pfts_Irrig_CMIP6_simyr2005_c230523.nc"
 EOF
 fi
 
@@ -253,8 +254,8 @@ fi
 # hist_nhtfrq # output frequency
 # hist_mfilt # number of values per file
 # hist_avgflag_pertape # averaging over the output interval
-# hist_dov2xy # true for 2D, false for 1D vector
-# hist_type1d_pertape # '' for 2D and no averaging (i.e. PFT output), 'COL' for columns, 'LAND' for land-units, 'GRID' for grid-cells
+# hist_dov2xy # true for 2D (grid cell level), false for 1D vector (pft, column or landunit output)
+# hist_type1d_pertape # Averaging for 1D vector output (when hist_dov2xy is false): average to 'GRID', 'LAND', 'COLS', 'PFTS'; ' ' for 2D and no averaging (i.e. PFT output)
 
 # Commented out during testing to avoid lots of output
 : '
@@ -268,7 +269,7 @@ hist_nhtfrq = 0, -24, -24, -6
 hist_mfilt  = 12, 365, 365, 4 
 hist_avgflag_pertape = 'A','M','X','I' 
 hist_dov2xy = .true.,.true.,.true.,.false. 
-hist_type1d_pertape = '','','',''
+hist_type1d_pertape = ' ',' ',' ',' '
 EOF
 
 print_log "*** Output frequency and averaging  ***"
@@ -282,7 +283,12 @@ print_log "h3: selected variables, 6-hourly values (-6), daily file (4 vals per 
 cat >> user_nl_clm << EOF
 hist_empty_htapes = .true.
 hist_fincl1 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
-hist_nhtfrq = -1
+hist_fincl2 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
+hist_fincl3 = 'TG', 'TV', 'TSOI', 'TSA', 'FSDS', 'FSR', 'FLDS', 'FIRE', 'FSH', 'EFLX_LH_TOT', 'FGR'
+hist_nhtfrq = 0, 0, -24
+hist_mfilt  = 12, 12, 365
+hist_avgflag_pertape = 'A','A','X'
+hist_dov2xy = .true.,.false.,.true.
 EOF
 
 
@@ -292,11 +298,11 @@ EOF
 
 if [[ $COMPILER =~ "oasis" ]]; then
     print_log "\n*** Adding OASIS routines ***"
-    ln -sf $CCLM2ROOT/cesm2_oas/src/oas/* SourceMods/src.drv/
+    ln -sf $CCLM2ROOT/cesm2_oasis/src/oas/* SourceMods/src.drv/
     rm SourceMods/src.drv/oas_clm_vardef.F90
-    ln -sf $CCLM2ROOT/cesm2_oas/src/drv/* SourceMods/src.drv/
-    ln -sf $CCLM2ROOT/cesm2_oas/src/oas/oas_clm_vardef.F90 SourceMods/src.share/
-    ln -sf $CCLM2ROOT/cesm2_oas/src/datm/* SourceMods/src.datm/
+    ln -sf $CCLM2ROOT/cesm2_oasis/src/drv/* SourceMods/src.drv/
+    ln -sf $CCLM2ROOT/cesm2_oasis/src/oas/oas_clm_vardef.F90 SourceMods/src.share/
+    ln -sf $CCLM2ROOT/cesm2_oasis/src/datm/* SourceMods/src.datm/
 fi
 
 
