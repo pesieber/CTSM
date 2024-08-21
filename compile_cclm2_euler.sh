@@ -10,6 +10,8 @@ set -e # failing commands will cause the shell script to exit
 # Case settings
 #==========================================
 
+#PROJECT=$WORK/cosmo_clm2_euler/
+
 date_1=$(date +'%Y-%m-%d %H:%M:%S')
 
 echo "*** Setting up case ***"
@@ -19,7 +21,9 @@ DOMAIN=eur # eur for CCLM2 (EURO-CORDEX), sa for South-America, glob otherwise
 RES=CLM_USRDAT # CLM_USRDAT (custom resolution defined by domain file) for CCLM2, f09_g17 (0.9x1.25) to test glob (inputdata downloaded)
 GRID=0.5 # 0.5 or 0.1 for CCLM2 with RES=CLM_USRDAT (for other RES, RES determines the grid)
 CODE=clm5.0 # clm5.0 for official release, clm5.0_features for Ronny's version, CTSMdev for latest 
-COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+# COMPILER=gnu-oasis # gnu for gnu/gcc, nvhpc for nvidia/nvhpc; setting to gnu-oasis or nvhpc-oasis will: (1) use different compiler config from .cime, (2) copy oasis source code to CASEDIR
+COMPILER=gnu-oasis
+#COMPILER=intel
 COMPILERNAME=gcc # gcc for gnu/gcc, nvhpc for nvidia/nvhpc; needed to find OASIS installation path
 #EXP="cclm2_$(date +'%Y%m%d-%H%M')" # custom case name with date - PS for testing
 EXP="cclm2_newVariables" # custom case name without date
@@ -27,28 +31,31 @@ GRIDNAME=${DOMAIN}_${GRID}
 CASENAME=$CODE.$COMPILER.$COMPSET.$RES.$GRIDNAME.$EXP
 
 DRIVER=mct # mct for clm5.0, mct or nuopc for CTSMdev, using nuopc requires ESMF installation (>= 8.2.0)
-MACH=pizdaint
-QUEUE=normal # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
+MACH=euler7
+QUEUE=normal.24h # USER_REQUESTED_QUEUE, overrides default JOB_QUEUE
 WALLTIME="00:20:00" # USER_REQUESTED_WALLTIME, overrides default JOB_WALLCLOCK_TIME, "00:20:00" for testing
 PROJ=$(basename "$(dirname "${PROJECT}")") # extract project name (e.g. sm61)
-NNODES=2 # number of nodes
-NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
+# NNODES=2 # number of nodes
+# NCORES=$(( NNODES * 12 )) # 12 cores per node (default MAX_MPITASKS_PER_NODE=12, was called NTASKS before, sets number of CPUs)
 NSUBMIT=0 # partition into smaller chunks, excludes the first submission
 STARTDATE="2000-01-01" # Used for DATM forcing (DATM streams files are required for this year), shouldn't matter for CCLM2 
 #NYEARS=1
 NHOURS=48 # PS - for testing, run for 1x 24h and write hourly output (see user_nl_clm); for 1 year need to change here, STOP_OPTION and output
 
 # Set directories
-export CLMROOT=$PWD # CLM code base directory on $PROJECT where this script is located
+export CLMROOT=$(dirname $(realpath "$0")) # CLM code base directory on $PROJECT where this script is located
 export CCLM2ROOT=$CLMROOT/.. # CCLM2 code base directory on $PROJECT where CLM, OASIS and COSMO are located
-export CASEDIR=$SCRATCH/CCLM2_cases/$CASENAME # case directory on scratch
-export CESMDATAROOT=$SCRATCH/CCLM2_inputdata # inputdata directory on scratch (to reuse, includes downloads and preprocessed EURO-CORDEX files)
-export CESMOUTPUTROOT=$SCRATCH/CCLM2_output/$CASENAME # output directory on scratch
+export CASEDIR=$PROJECT/CCLM2_cases/$CASENAME # case directory on scratch
+export CESMDATAROOT=$PROJECT/CCLM2_inputdata # inputdata directory on scratch (to reuse, includes downloads and preprocessed EURO-CORDEX files)
+# MAKE SURE THIS IS NOT ON PROJECT
+export CESMOUTPUTROOT=$PROJECT/CCLM2_output/$CASENAME # output directory on scratch
 
 # Log output (use "tee" to send output to both screen and $outfile)
-logfile=$SCRATCH/CCLM2_logs/${CASENAME}_mylogfile.log
+logfile=$PROJECT/CCLM2_logs/${CASENAME}_mylogfile.log
 mkdir -p "$(dirname "$logfile")" && touch "$logfile" # create parent/child directories and logfile
+
 cp $CLMROOT/$BASH_SOURCE $SCRATCH/CCLM2_logs/${CASENAME}_myjobscipt.sh # copy this script to logs
+
 print_log() {
     output="$1"
     echo -e "${output}" | tee -a $logfile
@@ -59,8 +66,9 @@ print_log "*** Case settings: compset ${COMPSET}, resolution ${RES}, domain ${DO
 print_log "*** Logfile at: ${logfile} ***"
 
 # Sync inputdata on scratch because scratch will be cleaned every month (change inputfiles on $PROJECT!)
-print_log "\n*** Syncing inputdata on scratch  ***"
-rsync -av /project/$PROJ/shared/CCLM2_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content (there are many unnecessary files now so we may want to clean up!)
+# not required as data already on $WORK
+# print_log "\n*** Syncing inputdata on scratch  ***"
+# rsync -av $PROJECT/CCLM2_EUR_inputdata/ $CESMDATAROOT/ | tee -a $logfile # also check for updates in file content (there are many unnecessary files now so we may want to clean up!)
 #sbatch --account=$PROJ --export=ALL,PROJ=$PROJ transfer_clm_inputdata.sh # xfer job to prevent overflowing the loginnode
 
 
@@ -144,8 +152,17 @@ fi
 #./xmlchange use_lai_streams=.true. # default is false (climatology as for LUCAS); does not work with xmlchange, change manually in lnd_in
 
 # Set the number of cores, nodes will be COST_PES/12 per default (env_mach_pes.xml)
-./xmlchange COST_PES=$NCORES # number of cores=CPUs
-./xmlchange NTASKS=$NCORES # number of tasks for each component (can be set with $NCORES or -$NNODES for same result)
+# ./xmlchange COST_PES=$NCORES # number of cores=CPUs
+# ./xmlchange NTASKS=$NCORES # number of tasks for each component (can be set with $NCORES or -$NNODES for same result)
+
+# from Urs' config
+# Set NTASKS_WAV=16, because WAV does not scale up at all
+NTASKS=512
+./xmlchange NTASKS_CPL=$NTASKS,NTASKS_ATM=$NTASKS,NTASKS_OCN=$NTASKS,NTASKS_ICE=$NTASKS,NTASKS_LND=$NTASKS,\
+NTASKS_WAV=16,NTASKS_GLC=$NTASKS,NTASKS_ROF=$NTASKS,NTASKS_ESP=1
+./xmlchange ROOTPE_CPL=0,ROOTPE_ATM=0,ROOTPE_OCN=0,ROOTPE_ICE=0,ROOTPE_LND=0,ROOTPE_WAV=0,ROOTPE_GLC=0,ROOTPE_ROF=0,ROOTPE_ESP=0
+
+
 
 # If parallel netcdf is used, PIO_VERSION="2" (have not gotten this to work!)
 #./xmlchange PIO_VERSION="1" # 1 is default in clm5.0, 2 is default in CTSMdev (both only work with defaults)
@@ -367,7 +384,7 @@ print_log "*** Loaded modules for build from .cime, passed to env_mach_specific.
 print_log "Check in ${CASEDIR}/software_environment.txt"
 
 print_log "\n*** Submitting job ***"
-./case.submit -a "-C gpu" | tee -a $logfile
+./case.submit | tee -a $logfile
 
 # fails for clm5.0_features because tasks-per-node evaluates to float (12.0) with python 3. Cannot find where the calculation is made. Can also not override it like this:
 # ./case.submit -a "-C gpu -p normal --ntasks-per-node 12" 
